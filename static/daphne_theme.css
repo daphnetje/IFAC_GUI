@@ -1,0 +1,129 @@
+.box {
+    background-color: lightblue;
+    border: 1px solid blue;
+    min-height: 50px;
+    font-size: 2rem;
+}
+
+.disc_pattern_upperbox {
+    background-color: #17A2B8;
+    color: white;
+    border: 1px solid black;
+    font-size: 0.99vw;
+}
+
+.inactive_upperbox {
+    background-color: #CBCBCB;
+}
+
+.disc_pattern_middlebox {
+    background-color: #E8F9FC;
+    color: black;
+    border: 1px solid black;
+    font-size: 0.99vw;
+}
+
+.inactive_middlebox {
+    background-color: #F0F0F0;
+}
+
+
+.disc_pattern_lowerbox {
+    background-color: #F4FDFE;
+    color: black;
+    border: 1px solid black;
+    font-size: 0.9vw;
+    font-family: "Lucida Console", "Courier New", monospace;
+    margin-bottom: 20px;
+}
+
+.inactive_lowerbox {
+    background-color: #F5F5F5;
+}
+
+.main-select{
+    width:40%;
+    margin-right: 10px;
+}
+
+.dependent-select{
+    width: 40%;
+    margin-right: 10px;
+}
+
+.select-field{
+  justify-content: center;
+  display: flex;
+}
+
+.centered{
+    justify-content: center;
+    display: flex;
+}
+
+
+.table-responsive{
+    max-height: 400px;
+}
+
+.tableFixHead {
+    overflow-y: auto; /* make the table scrollable if height is more than 200 px  */
+    height: 300px; /* gives an initial height of 200px to the table */
+}
+
+
+.tableFixHead thead th {
+    position: sticky; /* make the table heads sticky */
+    top: 0px; /* table head will be placed from the top of the table and sticks to it */
+ }
+
+.whiteLink {
+    color = white;
+}
+
+.indiv_instance_upperbox {
+    background-color: #FFC107;
+    color: white;
+    border: 1px solid black;
+    font-size: 0.99vw;
+    max-width: 50%;
+    max-height: 50%
+}
+
+.indiv_instance_middlebox {
+    background-color: #FFE7A3;
+    color: black;
+    border: 1px solid black;
+    max-width: 50%;
+    font-size: 0.99vw;
+}
+
+.indiv_instance_lowerbox {
+    background-color: #FFF2CD;
+    color: black;
+    border: 1px solid black;
+    font-size: 0.9vw;
+    font-family: "Lucida Console", "Courier New", monospace;
+    margin-bottom: 20px;
+    max-width: 50%;
+}
+
+#my-table .table_orange_highlight {
+    background-color: #F8CBAD;
+}
+
+#my-table .table_green_highlight {
+    background-color: #C5E0B4;
+}
+
+.yellow_highlight_box {
+    background-color: #FFF2CD;
+    border: 2px solid black;
+}
+
+.monospace {
+    min-height: 40px;
+    font-weight: normal;
+    font-size: 0.9vw;
+    font-family: "Lucida Console", "Courier New", monospace;
+}
