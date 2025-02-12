@@ -1,3 +1,11 @@
+.special_container {
+    display: flex;
+    align-items: center; /* Aligns items vertically */
+    justify-content: center; /* Centers the elements horizontally */
+    gap: 20px; /* Space between the elements */
+    width: 100%;
+}
+
 .box {
     background-color: lightblue;
     border: 1px solid blue;
@@ -6,30 +14,34 @@
 }
 
 .disc_pattern_upperbox {
-    background-color: #17A2B8;
+    border-top-left-radius: 25px;
+    border-top-right-radius: 25px;
+    background-color: #FFC107;
     color: white;
     border: 1px solid black;
     font-size: 0.99vw;
 }
 
 .inactive_upperbox {
-    background-color: #CBCBCB;
+    background-color: #17A2B8;
 }
 
 .disc_pattern_middlebox {
-    background-color: #E8F9FC;
+    background-color: #FFE7A3;
     color: black;
     border: 1px solid black;
     font-size: 0.99vw;
 }
 
 .inactive_middlebox {
-    background-color: #F0F0F0;
+    background-color: #E8F9FC;
 }
 
 
 .disc_pattern_lowerbox {
-    background-color: #F4FDFE;
+    border-bottom-right-radius: 25px;
+    border-bottom-left-radius: 25px;
+    background-color: #FFF2CD;
     color: black;
     border: 1px solid black;
     font-size: 0.9vw;
@@ -37,8 +49,29 @@
     margin-bottom: 20px;
 }
 
+/* Info box hidden by default */
+.info-box {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 10px;
+    background-color: #333;
+    color: white;
+    border-radius: 5px;
+    width: 200px;
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Show the info box when the parent box is hovered */
+.disc_pattern_middlebox:hover .info-box {
+    display: block;
+}
+
 .inactive_lowerbox {
-    background-color: #F5F5F5;
+    background-color: #F4FDFE;
 }
 
 .main-select{
@@ -81,12 +114,22 @@
     color = white;
 }
 
+.instance-box {
+    display: flex;
+    flex-direction: column;
+    width: auto;
+    min-width: 500px; /* Ensures it doesn’t get too small */
+    max-width: 60%; /* Restricts maximum size */
+}
+
 .indiv_instance_upperbox {
+    border-top-left-radius: 25px;
+    border-top-right-radius: 25px;
     background-color: #FFC107;
     color: white;
     border: 1px solid black;
     font-size: 0.99vw;
-    max-width: 50%;
+    width: 100%; /* Ensures all parts have the same width */
     max-height: 50%
 }
 
@@ -94,22 +137,34 @@
     background-color: #FFE7A3;
     color: black;
     border: 1px solid black;
-    max-width: 50%;
+    width: 100%; /* Ensures all parts have the same width */
     font-size: 0.99vw;
 }
 
 .indiv_instance_lowerbox {
+    border-bottom-right-radius: 25px;
+    border-bottom-left-radius: 25px;
     background-color: #FFF2CD;
     color: black;
     border: 1px solid black;
     font-size: 0.9vw;
     font-family: "Lucida Console", "Courier New", monospace;
     margin-bottom: 20px;
-    max-width: 50%;
+    width: 100%; /* Ensures all parts have the same width */
+}
+
+
+/* Override table-danger background color */
+.table-danger {
+  background-color: #f0cfc7 !important;  /* Your custom color */
 }
 
 #my-table .table_orange_highlight {
-    background-color: #F8CBAD;
+    background-color: #f0cfc7;
+}
+
+.bg-custom-orange {
+  background-color: #f0cfc7;
 }
 
 #my-table .table_green_highlight {
@@ -126,4 +181,68 @@
     font-weight: normal;
     font-size: 0.9vw;
     font-family: "Lucida Console", "Courier New", monospace;
+}
+
+
+.speech-bubble {
+    position: relative;
+    background: #F2F2F2;
+    padding: 15px;
+    border-radius: 10px;
+    border: 2px solid black;
+    max-width: 40%;
+}
+
+.speech-bubble::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -15px;
+    width: 0;
+    height: 0;
+    border-top: 2px solid black;
+    border-bottom: 2px solid black;
+    border-right: 15px solid #E0E0E0;
+    transform: translateY(-50%);
+}
+
+/* Styling the collapsible button */
+.collapsible {
+    background-color: #0FA3B1;
+    color: white;
+    cursor: pointer;
+    padding: 10px;
+    width: 100%;
+    border: none;
+    text-align: left;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 5px;
+    transition: 0.3s;
+}
+
+/* Add a hover effect */
+.collapsible:hover {
+    background-color: #0a717b;
+}
+
+/* Collapsible content */
+.content {
+    padding: 15px;
+    display: none;
+    overflow: hidden;
+    background-color: #e9fbfd;
+    border-radius: 5px;
+    margin-top: 5px;
+    border-left: 5px solid #0FA3B1
+}
+
+.example {
+    background-color: #F8F8F8;
+    padding: 10px;
+    border-left: 5px solid #797979 ;
+    border-top: 2px solid black;
+    border-bottom: 2px solid black;
+    border-right: 2px solid black;
+    margin-top: 10px;
 }

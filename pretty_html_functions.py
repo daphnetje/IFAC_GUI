@@ -1,27 +1,42 @@
 import json
+import ast
 from markupsafe import Markup
 
-
-def rule_dict_to_html(rule, max_rule_length=3):
-    rule_base_dict = json.loads(rule['rule_base'])
-    rule_consequence_dict = json.loads(rule['rule_conclusion'])
-
+def dicts_to_html(rule_base_dict, rule_consequence_dict, rule, max_rule_length=3):
     pretty_html = ''
     for key, value in rule_base_dict.items():
-        pretty_html += key + " = " + value + "<br>"
+        pretty_html += "<b>" + key + "</b> = " + value + "<br>"
 
-    line_breaks_to_add = max_rule_length-len(rule_base_dict) + 1
+    line_breaks_to_add = max_rule_length - len(rule_base_dict) + 1
     for i in range(line_breaks_to_add):
         pretty_html += '<br>'
 
     rule_consequence_key = list(rule_consequence_dict.keys())[0]
-    pretty_html += rule_consequence_key + " = " + rule_consequence_dict[rule_consequence_key]
+    pretty_html += "<b>" + rule_consequence_key + "</b> = " + rule_consequence_dict[rule_consequence_key]
+
+    pretty_support = f"{rule['support']:.2f}"
+    pretty_confidence = f"{rule['confidence']:.2f}"
+    pretty_slift = f"{rule['slift']:.2f}"
 
     complete_rule = {'id': int(rule['id']), 'rule_in_html': Markup(pretty_html), 'rule_base': rule_base_dict,
-                     'rule_conclusion': rule_consequence_dict, 'support': rule['support'], 'confidence': rule['confidence'], \
-                     'slift': rule['slift']}
-
+                     'rule_conclusion': rule_consequence_dict, 'support': pretty_support,
+                     'confidence': pretty_confidence, 'slift': pretty_slift}
     return complete_rule
+
+
+
+def rule_row_to_html(rule):
+    rule_base_dict = ast.literal_eval(rule['rule_base'])
+    rule_consequence_dict = ast.literal_eval(rule['rule_conclusion'])
+
+    return dicts_to_html(rule_base_dict, rule_consequence_dict, rule)
+
+
+def rule_dict_to_html(rule):
+    rule_base_dict = json.loads(rule['rule_base'])
+    rule_consequence_dict = json.loads(rule['rule_conclusion'])
+
+    return dicts_to_html(rule_base_dict, rule_consequence_dict, rule)
 
 
 def one_instance_html(instance, columns, numerical_columns, sensitive_columns):
@@ -41,6 +56,51 @@ def protected_info_html(instance):
     return pretty_html
 
 
+def protected_itemset_info_to_html(pd_itemset):
+    pd_itemset_dict = ast.literal_eval(pd_itemset)
+
+    pretty_html = ""
+    if 'race' in pd_itemset_dict:
+        if pd_itemset_dict['race'] == 'White alone':
+            pretty_html += "White "
+        elif pd_itemset_dict['race'] == 'Black or African American alone':
+            pretty_html += "Black "
+        else:
+            pretty_html += "Other "
+
+    if 'sex' in pd_itemset_dict:
+        if pd_itemset_dict['sex'] == 'Female':
+            pretty_html += "Women"
+        else:
+            pretty_html += "Men"
+    else:
+        pretty_html += " people"
+    return pretty_html
+
+
 def decision_ratio_information(number_of_instances, pos_decision_ratio):
     percentage_ratio = pos_decision_ratio * 100
-    return f"We found {number_of_instances} similar instances of which {percentage_ratio:.2f}% have a high income"
+    return f"Out of {number_of_instances} similar instances, {percentage_ratio:.2f}% have a high income"
+
+
+def disc_pattern_to_one_line_html(pattern):
+    rule_base_dict = json.loads(pattern['rule_base'])
+    pd_itemset_dict = json.loads(pattern['pd_itemset'])
+    rule_consequence_dict = json.loads(pattern['rule_conclusion'])
+    complete_rule_base = {**rule_base_dict, **pd_itemset_dict}
+
+    one_line_html = ""
+
+    index = 0
+    for key, value in complete_rule_base.items():
+        one_line_html += "<b> " + key + " </b> = " + value
+        if index<(len(complete_rule_base)-1):
+            one_line_html += ", "
+        index += 1
+
+    one_line_html += "<br>"
+
+    rule_consequence_key = list(rule_consequence_dict.keys())[0]
+    one_line_html += "&rightarrow; <b>" + rule_consequence_key + "</b> = " + rule_consequence_dict[rule_consequence_key]
+
+    return Markup(one_line_html)

@@ -1,10 +1,11 @@
 from flask import Flask, request, jsonify, url_for, redirect, session, render_template, g
 from flask_caching import Cache
 import sqlite3
-from database_helper_functions import query_builder_multiple_filters, get_indices_covered_by_pattern
-from pretty_html_functions import rule_dict_to_html, one_instance_html, protected_info_html, decision_ratio_information
+from database_helper_functions import query_builder_multiple_filters, get_indices_covered_by_pattern, get_instances_covered_by_rule_base, get_instances_covered_by_rule_base_and_consequence, get_relevant_columns_in_pattern, get_relevant_columns_in_pattern_without_consequence
+from pretty_html_functions import rule_dict_to_html, disc_pattern_to_one_line_html, rule_row_to_html, one_instance_html, protected_info_html, decision_ratio_information, protected_itemset_info_to_html
 from situation_testing import number_of_positive_decisions, run_situation_testing
 from initializing_database_functions import load_in_decision_rules
+import ast
 
 import pandas as pd
 
@@ -15,18 +16,17 @@ app.config['SECRET_KEY'] = 'Tf42Cq7ZtH5TsoZfiYXrpSkN7xUGzWaV'
 
 dataset_dict = {'age': ["Younger than 30", "30 - 39", "40-49", "50-59", "Older than 60"],
                 'marital_status': ['Never married', 'Married', 'Seperated', 'Widowed'],
-                'hours_per_week' : ["Less than 20", "20 to 39", "40 to 49", "More than 50"],
+                'workinghours' : ["Less than 20", "20 to 39", "40 to 49", "More than 50"],
                 'education' : ['Middle School', 'High School', 'Higher Ed.', 'Bachelors', 'Masters', 'Doctorate'],
-                'work_sector' : ['self-employed', 'private', 'government'],
+                'workclass' : ['self-employed', 'private', 'government'],
                 'occupation': ['Exec-managerial', 'Machine-op-inspct', 'Prof-specialty', 'Other-service', 'Adm-clerical', 'Transport-moving', 'Sales', 'Craft-repair', 'Farming-fishing', 'Tech-support', 'Other', 'Handlers-cleaners'],
                 'race' : ['White', 'Black'],
                 'sex' : ["Female", "Male"],
-                'income' : ['<=50K', '>50K'],
-                'age_num': [1, 2, 3, 4, 5],
-                'hours_per_week_num': [1, 2, 3, 4],
-                'education_num': [1, 2, 3, 4, 5, 6, 7]}
+                'income' : ['<=50K', '>50K']}
 numerical_columns = ['age_num', 'hours_per_week_num', 'education_num']
-all_columns = ['id', 'age', 'marital_status', 'hours_per_week', 'education', 'work_sector', 'occupation', 'race', 'sex', 'income', 'age_num', 'hours_per_week_num', 'education_num']
+all_columns = ['age', 'marital_status', 'workinghours', 'education', 'workclass', 'occupation', 'race', 'sex', 'income']
+all_columns_with_id = ['id', 'age', 'marital_status', 'workinghours', 'education', 'workclass', 'occupation', 'race', 'sex', 'income']
+
 
 dataset_loaded = False
 
@@ -63,7 +63,7 @@ def index():
             selected_column_filters[selected_column_name] = selected_value
 
         db = get_db()
-        query_to_filter, values_to_filter = query_builder_multiple_filters(selected_column_filters)
+        query_to_filter, values_to_filter = query_builder_multiple_filters(relevant_table='test_data',relevant_columns='*', column_value_filter_dict=selected_column_filters)
         adult_dataset_cursor = db.execute(query_to_filter, values_to_filter)
         results = adult_dataset_cursor.fetchall()
         print(len(results))
@@ -71,103 +71,164 @@ def index():
         return render_template('home.html', column_names=dataset_dict.keys(), numerical_cols = numerical_columns, results=results, number_of_results = len(results))
 
     db = get_db()
-    adult_dataset_cursor = db.execute('select * from adult_dataset')
+    adult_dataset_cursor = db.execute('select * from test_data')
     results = adult_dataset_cursor.fetchall()
     adult_dataset_cursor.close()
     return render_template('home.html', column_names = dataset_dict.keys(),numerical_cols = numerical_columns, results = results, number_of_results = len(results))
 
-
-@app.route('/inspect_patterns', defaults = {'pattern_id': -99999}, methods = ['GET'])
-@app.route('/inspect_patterns/<pattern_id>', methods = ['GET', 'POST'])
-def inspect_patterns(pattern_id):
+@app.route('/filter_discriminatory_rules', methods = ['GET', 'POST'])
+def filter_discriminatory_rules():
     db = get_db()
 
+    disc_patterns_cursor = db.execute("SELECT id, pd_itemset, rule_base, rule_conclusion, support, confidence, slift, p_value_slift FROM discriminatory_patterns")
+    all_disc_patterns = disc_patterns_cursor.fetchall()
+    disc_patterns_cursor.close()
+    disc_patterns_df = pd.DataFrame.from_records(data=all_disc_patterns, columns=["id", "pd_itemset", "rule_base", "rule_conclusion", "support", "confidence", "slift", "p_value_slift"])
+    unique_pd_itemsets = disc_patterns_df["pd_itemset"].unique()
+
+    adult_test_dataset_cursor = db.execute(
+        'select id, age, marital_status, workinghours, education, workclass, occupation, race, sex, income from test_data')
+    adult_dataset_test_results = adult_test_dataset_cursor.fetchall()
+    adult_test_dataset_cursor.close()
+
+    # put the validation dataset (that already has been fetched in previous query) in df format
+    test_dataset = pd.DataFrame.from_records(data=adult_dataset_test_results, index='id', columns=all_columns_with_id)
+
+    pd_itemset_rule_dict = {}
+    pd_itemset_html_dict = {}
+    pd_itemset_pos_ratio = {}
+    pd_itemset_n = {}
+
+    for pd_itemset in unique_pd_itemsets:
+        pd_itemset_in_html = protected_itemset_info_to_html(pd_itemset)
+        rules_for_pd_itemset = disc_patterns_df[disc_patterns_df['pd_itemset'] == pd_itemset]
+        rules_in_pretty_html = rules_for_pd_itemset.apply(rule_row_to_html, axis=1)
+
+        #
+        pd_itemset_dict = ast.literal_eval(pd_itemset)
+        n_instances_in_pd_itemset = len(get_instances_covered_by_rule_base(pd_itemset_dict, test_dataset))
+        n_instances_in_pd_itemset_pos_decision = len(get_instances_covered_by_rule_base_and_consequence(rule_base=pd_itemset_dict, rule_consequence={"income" : "high"}, data=test_dataset))
+        pos_ratio_pd_itemset = n_instances_in_pd_itemset_pos_decision/n_instances_in_pd_itemset
+
+        pd_itemset_rule_dict[pd_itemset] = rules_in_pretty_html
+        pd_itemset_html_dict[pd_itemset] = pd_itemset_in_html
+        pd_itemset_pos_ratio[pd_itemset] = f"{pos_ratio_pd_itemset:.2f}"
+        pd_itemset_n[pd_itemset] = n_instances_in_pd_itemset
+
+
+    return render_template("filter_discriminatory_rules.html", patterns=pd_itemset_rule_dict, pd_itemset_html_dict=pd_itemset_html_dict, pd_itemset_n = pd_itemset_n, pd_itemset_pos_ratio=pd_itemset_pos_ratio)
+
+
+#@app.route('/inspect_patterns/<pd_itemset>/', defaults = {'pattern_id': -99999}, methods = ['GET'])
+#@app.route('/inspect_patterns/<pd_itemset>/<pattern_id>', methods = ['GET', 'POST'])
+@app.route('/inspect_patterns/<pd_itemset>/', methods = ['GET', 'POST'])
+def inspect_patterns(pd_itemset):
+    db = get_db()
+    pd_itemset_in_html = protected_itemset_info_to_html(pd_itemset)
+
+    # Get pattern_id from query parameters (instead of URL path)
+    pattern_id = request.args.get("pattern_id", -99999, type=int)
+    pos_ratio_pd_itemset = request.args.get("pos_ratio_pd_itemset")
+    n_pd_itemset = request.args.get("n_pd_itemset")
+
     #get all discriminatory patterns
-    disc_patterns_cursor = db.execute('select * from discriminatory_patterns')
+    disc_patterns_cursor = db.execute('select * from discriminatory_patterns where pd_itemset = ?', [pd_itemset])
     disc_patterns_results = disc_patterns_cursor.fetchall()
     disc_decision_rules = [rule_dict_to_html(result) for result in disc_patterns_results]
 
-    #get all the dataset instances to show in table
-    adult_dataset_cursor = db.execute('select age, marital_status, hours_per_week, education, work_sector, occupation, race, sex, income, age_num, hours_per_week_num, education_num from adult_dataset')
-    dataset_results = adult_dataset_cursor.fetchall()
-    adult_dataset_cursor.close()
+    pd_itemset_dict = ast.literal_eval(pd_itemset)
+    query_to_filter, values_to_filter = query_builder_multiple_filters(relevant_table='test_data', relevant_columns = 'id, age, marital_status, workinghours, education, workclass, occupation, race, sex, income', column_value_filter_dict=pd_itemset_dict)
+    adult_test_dataset_cursor = db.execute(query_to_filter, values_to_filter)
+    adult_dataset_test_results = adult_test_dataset_cursor.fetchall()
+    adult_test_dataset_cursor.close()
+
+    adult_val_dataset_cursor = db.execute(
+        'select id, age, marital_status, workinghours, education, workclass, occupation, race, sex, income from validation_data')
+    adult_dataset_val_results = adult_val_dataset_cursor.fetchall()
+    adult_val_dataset_cursor.close()
+
+    val_dataset = pd.DataFrame.from_records(data=adult_dataset_val_results, index='id', columns=all_columns_with_id)
+    test_dataset = pd.DataFrame.from_records(data=adult_dataset_test_results, index='id', columns=all_columns_with_id)
 
     relevant_indices = []
     number_of_affected_instances = 0
-    #depending on whether a pattern has been selected get the dataset instances (indicated by their indices) that fall
-    #under this pattern and that need to be highlighted
-
+    sorted_data_by_disc_score = pd.DataFrame([])
     disc_scores_list = []
-    indices_to_highlight = []
+    column_names_in_pattern = []
+
     if (pattern_id != -99999):
         selected_pattern_cursor = db.execute('select * from discriminatory_patterns where id = ?', [pattern_id])
         selected_pattern = selected_pattern_cursor.fetchone()
+        selected_pattern_cursor.close()
+        print(pattern_id)
 
-        #put the dataset (that already has been fetched in previous query) in df format
-        dataset = pd.DataFrame.from_records(data=dataset_results, columns=dataset_dict.keys())
-
-        relevant_indices = get_indices_covered_by_pattern(selected_pattern, dataset)
+        column_names_in_pattern = get_relevant_columns_in_pattern(selected_pattern)
+        relevant_indices = get_indices_covered_by_pattern(selected_pattern, test_dataset)
+        relevant_data = test_dataset.loc[relevant_indices]
         number_of_affected_instances = len(relevant_indices)
 
-        disc_scores_of_relevant_indices, distances_to_protected_df, distances_to_reference_group_df = run_situation_testing(selected_pattern, {'sex':'Female'}, relevant_indices, dataset)
+        disc_scores_of_relevant_indices, nearest_reference_neighbors_df, nearest_non_reference_neighbors_df = run_situation_testing(selected_pattern, relevant_data, val_dataset)
         disc_scores_list = disc_scores_of_relevant_indices.tolist()
-
+        relevant_data['disc_score'] = disc_scores_of_relevant_indices
+        #sort according to disc_score
+        sorted_data_by_disc_score = relevant_data.sort_values(by=['disc_score'], ascending=False)
 
     if request.method == 'POST':
         selected_index = int(request.form['selected_index'])
         disc_score_of_index = disc_scores_of_relevant_indices.loc[selected_index]
 
-        distances_of_index_to_protected = distances_to_protected_df.loc[selected_index]
-        distances_of_index_to_ref_group = distances_to_reference_group_df.loc[selected_index]
-        closest_prot_indices = distances_of_index_to_protected[distances_of_index_to_protected <= 0.5].index.tolist()
-        closest_prot_indices_string_format = ','.join(str(i) for i in closest_prot_indices)
+        nearest_reference_neighbors_of_instance = nearest_reference_neighbors_df.loc[selected_index].tolist()
+        nearest_non_reference_neighbors_of_instance =nearest_non_reference_neighbors_df.loc[selected_index].tolist()
+        closest_non_ref_indices_string_format = ','.join(str(i) for i in nearest_non_reference_neighbors_of_instance)
+        closest_ref_group_indices_string_format = ','.join(str(i) for i in nearest_reference_neighbors_of_instance)
 
-        closest_ref_group_indices = distances_of_index_to_ref_group[distances_of_index_to_ref_group <= 0.5].index.tolist()
-        closest_ref_group_indices_string_format = ','.join(str(i) for i in closest_ref_group_indices)
+        return redirect(url_for("inspect_nearest_neighbours", index = selected_index, disc_score = disc_score_of_index, closest_non_ref=closest_non_ref_indices_string_format, closest_ref=closest_ref_group_indices_string_format, selected_pattern_id=pattern_id))
 
-        if closest_ref_group_indices_string_format == "":
-            closest_ref_group_indices_string_format = "None"
-        return redirect(url_for("inspect_nearest_neighbours", index = selected_index, disc_score = disc_score_of_index, closest_prot=closest_prot_indices_string_format, closest_ref=closest_ref_group_indices_string_format))
-
-    return render_template('inspect_discriminatory_patterns.html', column_names = dataset_dict.keys(),
-                           numerical_cols = numerical_columns, dataset_results = dataset_results,
-                           rules = disc_decision_rules, active_pattern_id = int(pattern_id),
+    return render_template('inspect_pd_itemset.html', pd_itemset=pd_itemset, pd_itemset_in_html = pd_itemset_in_html, column_names = all_columns_with_id,
+                           n_pd_itemset = n_pd_itemset, pos_ratio_pd_itemset = pos_ratio_pd_itemset,
+                           dataset_results = test_dataset, rules = disc_decision_rules, active_pattern_id = int(pattern_id),
+                           column_names_in_pattern = column_names_in_pattern,
                            indices_to_highlight = relevant_indices, disc_scores_of_indices = disc_scores_list,
+                           sorted_by_disc_score_data_to_highlight = sorted_data_by_disc_score,
                            number_of_affected_instances = number_of_affected_instances)
 
 
-@app.route('/inspect_nearest_neighbours/<index>/<disc_score>/<closest_prot>/<closest_ref>', methods=['GET', 'POST'])
-def inspect_nearest_neighbours(index, disc_score, closest_prot, closest_ref):
+
+@app.route('/inspect_nearest_neighbours/<index>/<disc_score>/<closest_non_ref>/<closest_ref>/<selected_pattern_id>', methods=['GET', 'POST'])
+def inspect_nearest_neighbours(index, disc_score, closest_non_ref, closest_ref, selected_pattern_id):
     db = get_db()
 
-    id_in_database = str(int(index) + 1)
-    selected_instance_cursor = db.execute("SELECT age, marital_status, hours_per_week, education, work_sector, occupation, race, sex, income from adult_dataset WHERE id=?",[id_in_database])
+    selected_instance_cursor = db.execute("SELECT age, marital_status, workinghours, education, workclass, occupation, race, sex, income from test_data WHERE id=?",[index])
     selected_instance = selected_instance_cursor.fetchone()
     selected_instance_html = one_instance_html(selected_instance, columns=dataset_dict.keys(),
                                                numerical_columns=numerical_columns, sensitive_columns=['race', 'sex'])
     prot_info_html = protected_info_html(selected_instance)
 
-    if (closest_prot != 'None'):
-        closest_prot_list = list(closest_prot.split(","))
+    selected_pattern_cursor = db.execute('select * from discriminatory_patterns where id = ?', [selected_pattern_id])
+    selected_pattern = selected_pattern_cursor.fetchone()
+    selected_pattern_cursor.close()
+    selected_pattern_html = disc_pattern_to_one_line_html(selected_pattern)
+    column_names_in_pattern = get_relevant_columns_in_pattern_without_consequence(selected_pattern)
+
+    if (closest_non_ref != 'None'):
+        closest_prot_list = list(closest_non_ref.split(","))
         #+1 is not so nice here, it's because database ids start counting from 1 rather than 0. should change this in database!!
-        closest_prot_list = [int(i)+1 for i in closest_prot_list]
         closest_prot_placeholder = ','.join(['?'] * len(closest_prot_list))
 
-        adult_dataset_cursor_prot = db.execute(f"SELECT * FROM adult_dataset WHERE id IN ({closest_prot_placeholder})", closest_prot_list)
-        dataset_closest_prot_results = adult_dataset_cursor_prot.fetchall()
-        dataset_closest_prot_results_df = pd.DataFrame.from_records(data=dataset_closest_prot_results, columns=all_columns)
-        pos_decision_ratio_prot = number_of_positive_decisions(dataset_closest_prot_results_df['income'])/len(dataset_closest_prot_results)
-        pos_decision_ratio_prot_html = decision_ratio_information(len(dataset_closest_prot_results_df), pos_decision_ratio_prot)
+        adult_dataset_cursor_prot = db.execute(f"SELECT age, marital_status, workinghours, education, workclass, occupation, race, sex, income FROM validation_data WHERE id IN ({closest_prot_placeholder})", closest_prot_list)
+        dataset_closest_non_ref_results = adult_dataset_cursor_prot.fetchall()
+        dataset_closest_non_ref_results_df = pd.DataFrame.from_records(data=dataset_closest_non_ref_results, columns=all_columns)
+        pos_decision_ratio_non_ref = number_of_positive_decisions(dataset_closest_non_ref_results_df['income']) / len(dataset_closest_non_ref_results)
+        pos_decision_ratio_non_ref_html = decision_ratio_information(len(dataset_closest_non_ref_results_df), pos_decision_ratio_non_ref)
     else:
-        pos_decision_ratio_prot_html = ""
+        pos_decision_ratio_non_ref_html = ""
         dataset_closest_prot_results = "None"
 
     if (closest_ref!= 'None'):
         closest_ref_list = list(closest_ref.split(","))
-        closest_ref_list = [int(i) + 1 for i in closest_ref_list]
         closest_ref_placeholder = ','.join(['?'] * len(closest_ref_list))
 
-        adult_dataset_cursor_ref = db.execute(f"SELECT * FROM adult_dataset WHERE id IN ({closest_ref_placeholder})",
+        adult_dataset_cursor_ref = db.execute(f"SELECT age, marital_status, workinghours, education, workclass, occupation, race, sex, income FROM validation_data WHERE id IN ({closest_ref_placeholder})",
                                                closest_ref_list)
         dataset_closest_ref_results = adult_dataset_cursor_ref.fetchall()
         dataset_closest_ref_results_df = pd.DataFrame.from_records(data=dataset_closest_ref_results,
@@ -181,9 +242,10 @@ def inspect_nearest_neighbours(index, disc_score, closest_prot, closest_ref):
         dataset_closest_ref_results = "None"
 
     return render_template('inspect_nearest_neighbours.html', selected_index=index, prot_info = prot_info_html, selected_instance_html = selected_instance_html,
-                           selected_instance=selected_instance, disc_score = disc_score, closest_prot_results = dataset_closest_prot_results,
-                           closest_ref_results = dataset_closest_ref_results, pos_ratio_prot = pos_decision_ratio_prot_html, pos_ratio_ref = pos_decision_ratio_ref_html,
-                           column_names = dataset_dict.keys(), numerical_cols = numerical_columns)
+                           selected_pattern_html = selected_pattern_html, column_names_in_pattern = column_names_in_pattern,
+                           selected_instance=selected_instance, disc_score = disc_score, closest_prot_results = dataset_closest_non_ref_results,
+                           closest_ref_results = dataset_closest_ref_results, pos_ratio_prot = pos_decision_ratio_non_ref_html, pos_ratio_ref = pos_decision_ratio_ref_html,
+                           column_names = dataset_dict.keys())
 
 if __name__=='__main__':
     app.run(debug = True)

@@ -7,107 +7,131 @@ from database_helper_functions import get_instances_covered_by_rule_base_and_con
 
 def number_of_positive_decisions(decision_vector):
     value_counts = decision_vector.value_counts()
-    if '>50K' in value_counts.keys():
-        return value_counts['>50K']
+    if 'high' in value_counts.keys():
+        return value_counts['high']
     else:
         return 0
 
-def run_situation_testing(selected_pattern, prot_group_of_pattern, relevant_indices, dataset):
-    #get the instances that are covered by some rule and only keep the numerical columns (needed to compute distance
-    #function for situation testing)
-    relevant_instances = dataset.iloc[relevant_indices]
-    relevant_instances_numerical_format = relevant_instances[['age_num', 'marital_status', 'hours_per_week_num',
-                                                              'education_num', 'work_sector', 'occupation', 'race',
-                                                              'sex', 'income']]
+def positive_decision_ratio(data, neighbours_indices):
+    decision_info_of_neighbours = data.loc[neighbours_indices, 'income']
+    positive_decision_count = (decision_info_of_neighbours == 'high').sum()
+    return positive_decision_count/ len(neighbours_indices)  # Compute the ratio
 
+def run_situation_testing(selected_pattern, test_instances_covered_by_rule, val_dataset):
     #similar instances are found within the space of other instances that are covered by rule base (excluding the prot.
     #information from rule base)
-    rule_base_dict = json.loads(selected_pattern['rule_base'])
-    rule_base_without_protected_group = {k: v for k, v in rule_base_dict.items() if k not in prot_group_of_pattern}
+    rule_base_without_protected_group = json.loads(selected_pattern['rule_base'])
+    prot_group_of_pattern = json.loads(selected_pattern['pd_itemset'])
+
     #TODO: consider if I really want to only search among instances for which the rule base is covered
-    dataset = get_instances_covered_by_rule_base(rule_base_without_protected_group, dataset)
-    dataset_numerical_format = dataset[['age_num', 'marital_status', 'hours_per_week_num',
-                                                              'education_num', 'work_sector', 'occupation', 'race',
-                                                              'sex', 'income']]
+    val_instances_covered_by_rule = get_instances_covered_by_rule_base(rule_base_without_protected_group, val_dataset)
 
     #extract group of other protected instances and reference group
-    reference_group = dataset_numerical_format[(dataset['sex'] == 'Male') & (dataset['race'] == 'White')]
+    val_reference_group = val_instances_covered_by_rule[(val_instances_covered_by_rule['sex'] == 'Male') & (val_instances_covered_by_rule['race'] == 'White alone')]
+
     #STILL HAVE TO DECIDE HERE WHAT WE WILL TAKE AS OTHER PROT INSTANCES (maybe best to look within specific intersectional
     # spaces like, white women, black women, black men, etc)
-    other_protected_instances = dataset_numerical_format[(dataset['sex'] != 'Male') | (dataset['race'] != 'White')]
+    val_non_reference_group = val_instances_covered_by_rule[(val_instances_covered_by_rule['sex'] != 'Male') | (val_instances_covered_by_rule['race'] != 'White alone')]
 
-    distances_to_protected = cdist(relevant_instances_numerical_format, other_protected_instances,
-                                   metric=distance_function_adult_dataset)
-    distances_to_protected_df = pd.DataFrame(distances_to_protected, columns=other_protected_instances.index,
-                                             index=relevant_instances_numerical_format.index)
+    distances_to_non_reference_group = cdist(test_instances_covered_by_rule, val_non_reference_group,
+                                             metric=distance_function_adult_dataset)
+    distance_df_to_non_reference = pd.DataFrame(distances_to_non_reference_group, columns=val_non_reference_group.index,
+                                                       index=test_instances_covered_by_rule.index)
+    # Find the k nearest neighbors of the non_reference_group for each index in the dataset
+    nearest_non_reference_neighbors = distance_df_to_non_reference.apply(lambda row: row.nsmallest(5).index.tolist(), axis=1)
 
-    distances_to_reference_group = cdist(relevant_instances_numerical_format, reference_group,
-                                   metric=distance_function_adult_dataset)
-    distances_to_reference_group_df = pd.DataFrame(distances_to_reference_group, columns=reference_group.index,
-                                             index=relevant_instances_numerical_format.index)
-
-    disc_scores = []
-    i = 0
-    #for index in range(len(relevant_instances_numerical_format)):
-    for index in relevant_indices:
-        distance_row_protected = distances_to_protected_df.loc[index]
-        closest_indices_protected = distance_row_protected[distance_row_protected <= 0.5].index.tolist()
-        # sorted = distance_row_protected.argsort()
-        # sorted_indices_protected = distance_row_protected.iloc[sorted].index
-        # closest_indices_protected = sorted_indices_protected[:5]
-        decision_info_closest_prot_neighbours = other_protected_instances.loc[closest_indices_protected]['income']
-
-        distance_row_unprotected = distances_to_reference_group_df.loc[index]
-        closest_indices_unprotected = distance_row_unprotected[distance_row_unprotected <= 0.5].index.tolist()
-        # sorted = distance_row_unprotected.argsort()
-        # sorted_indices_unprotected = distance_row_unprotected.iloc[sorted].index
-        # closest_indices_unprotected = sorted_indices_unprotected[:5]
-        decision_info_closest_unprot_neighbours = reference_group.loc[closest_indices_unprotected]['income']
+    nearest_non_reference_neighbors_df = pd.DataFrame(nearest_non_reference_neighbors.tolist(), index=test_instances_covered_by_rule.index,
+                                               columns=[f'Neighbor_{i + 1}' for i in range(5)])
 
 
-        number_of_similar_prots = len(decision_info_closest_prot_neighbours)
-        number_of_similar_refs = len(decision_info_closest_unprot_neighbours)
+    distances_to_reference_group = cdist(test_instances_covered_by_rule, val_reference_group,
+                                         metric=distance_function_adult_dataset)
+    distance_df_to_reference = pd.DataFrame(distances_to_reference_group, columns=val_reference_group.index,
+                                                   index=test_instances_covered_by_rule.index)
+    # Find the k nearest neighbors of the reference group for each index in the dataset
+    nearest_reference_neighbors = distance_df_to_reference.apply(lambda row: row.nsmallest(5).index.tolist(), axis=1)
+    nearest_reference_neighbors_df = pd.DataFrame(nearest_reference_neighbors.tolist(), index=test_instances_covered_by_rule.index,
+                                                             columns=[f'Neighbor_{i + 1}' for i in range(5)])
 
-        if number_of_similar_prots > 0:
-            ratio_pos_labels_prot = number_of_positive_decisions(decision_info_closest_prot_neighbours) / len(decision_info_closest_prot_neighbours)
+    pos_ratio_non_reference_neighbours = nearest_non_reference_neighbors_df.apply(
+        lambda row: positive_decision_ratio(val_non_reference_group, row), axis=1)
+    pos_ratio_reference_neighbours = nearest_reference_neighbors_df.apply(
+        lambda row: positive_decision_ratio(val_reference_group, row), axis=1)
 
-        if number_of_similar_refs > 0:
-            ratio_pos_labels_unprot = number_of_positive_decisions(decision_info_closest_unprot_neighbours)  / len(decision_info_closest_unprot_neighbours)
-
-        if (number_of_similar_refs == 0) | (number_of_similar_prots == 0) :
-            disc_score = -999
-        else:
-            disc_score = ratio_pos_labels_unprot - ratio_pos_labels_prot
-
-        disc_scores.append(disc_score)
-
-    disc_scores = pd.Series(disc_scores, index=relevant_indices)
-    return disc_scores, distances_to_protected_df, distances_to_reference_group_df
+    disc_scores = pos_ratio_reference_neighbours - pos_ratio_non_reference_neighbours
 
 
+    # disc_scores = []
+    # i = 0
+    # #for index in range(len(relevant_instances_numerical_format)):
+    # for index in relevant_indices:
+    #     distance_row_non_reference= distances_to_non_reference_group_df.loc[index]
+    #     #closest_indices_non_reference = distance_row_non_reference[distance_row_non_reference <= 0.8].index.tolist()
+    #     sorted = distance_row_non_reference.argsort()
+    #     sorted_indices_non_reference = distance_row_non_reference.iloc[sorted].index
+    #     closest_indices_non_reference = sorted_indices_non_reference[:5]
+    #     decision_info_closest_non_ref_neighbours = val_non_reference_group.loc[closest_indices_non_reference]['income']
+    #
+    #     distance_row_reference = distances_to_reference_group_df.loc[index]
+    #     #closest_indices_reference = distance_row_reference[distance_row_reference <= 0.8].index.tolist()
+    #     sorted = distance_row_reference.argsort()
+    #     sorted_indices_unprotected = distance_row_reference.iloc[sorted].index
+    #     closest_indices_reference = sorted_indices_unprotected[:5]
+    #     decision_info_closest_reference_neighbours = val_reference_group.loc[closest_indices_reference]['income']
+    #
+    #     number_of_similar_prots = len(decision_info_closest_non_ref_neighbours)
+    #     number_of_similar_refs = len(decision_info_closest_reference_neighbours)
+    #
+    #     if number_of_similar_prots > 0:
+    #         ratio_pos_labels_non_reference = number_of_positive_decisions(decision_info_closest_non_ref_neighbours) / len(decision_info_closest_non_ref_neighbours)
+    #
+    #     if number_of_similar_refs > 0:
+    #         ratio_pos_labels_reference = number_of_positive_decisions(decision_info_closest_reference_neighbours) / len(decision_info_closest_reference_neighbours)
+    #
+    #     if (number_of_similar_refs == 0) | (number_of_similar_prots == 0) :
+    #         disc_score = -999
+    #     else:
+    #         disc_score = ratio_pos_labels_reference - ratio_pos_labels_non_reference
+    #
+    #     disc_scores.append(disc_score)
+    #
+    # disc_scores = pd.Series(disc_scores, index=relevant_indices)
+    return disc_scores, nearest_reference_neighbors_df, nearest_non_reference_neighbors_df
+
+
+#order of features: ['age_num', 'marital status', 'workinghours_num', 'education_num', 'workclass', 'occupation', 'race', 'sex', 'income']]
 def distance_function_adult_dataset(x1, x2):
-    age_diff = abs(x1[0] - x2[0]) / 4
+    age_dict = {"Younger than 25": 1, "25-29": 2, "30-39": 3, "40-49": 4, "50-59": 5, "60-69": 6, "Older than 70": 7}
+    age_diff = abs(age_dict[x1[0]] - age_dict[x2[0]]) / 6
 
     if x1[1] == x2[1]:
         marital_status_diff = 0
     else:
-        marital_status_diff = 0.5
+        marital_status_diff = 0.4
 
-    hours_per_week_diff = abs(x1[2] - x2[2]) / 3
-    education_diff = abs(x1[3] - x2[3]) / 6
+    workinghours_dict = {"Less than 20": 1, "20-39": 2, "40-49": 4, "More than 50": 5}
+    workinghours_diff = abs(workinghours_dict[x1[2]] - workinghours_dict[x2[2]]) / 3
+
+    education_dict = {"No Elementary School":1, "Elementary School":2, "Middle School":3,
+                            "Started High School, No Diploma":4, "High School or GED Diploma":5,
+                            "Started College, No Diploma":6, "Associate Degree":7, "Bachelor Degree":8,
+                            "Master or other Degree Beyond Bachelor":9, "Doctorate Degree":10}
+    education_diff = abs(education_dict[x1[3]] - education_dict[x2[3]]) / 9
+
 
     if x1[4] == x2[4]:
-        work_sec_diff = 0
+        workclass_diff = 0
     else:
-        work_sec_diff = 0.5
+        workclass_diff = 0.5
 
     if x1[5] == x2[5]:
         occupation_diff = 0
     else:
-        occupation_diff = 0.5
+        occupation_diff = 0.7
 
-    return age_diff + marital_status_diff + hours_per_week_diff + education_diff + work_sec_diff + occupation_diff
-#
+    return age_diff + marital_status_diff + education_diff + workinghours_diff + workclass_diff + occupation_diff
+
+
 # def run_situation_testing(selected_pattern, prot_group_of_pattern, relevant_indices, dataset, cache):
 #     distance_matrix = cache.get("distance_matrix")
 #     if (distance_matrix is not None):
