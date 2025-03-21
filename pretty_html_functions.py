@@ -104,3 +104,4 @@ def disc_pattern_to_one_line_html(pattern):
     one_line_html += "&rightarrow; <b>" + rule_consequence_key + "</b> = " + rule_consequence_dict[rule_consequence_key]
 
     return Markup(one_line_html)
+

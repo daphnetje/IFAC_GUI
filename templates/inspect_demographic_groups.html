@@ -6,32 +6,29 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Custom styles -->
     <link href="{{ url_for('static', filename='daphne_theme.css') }}" rel="stylesheet">
-    <title>Filter Discriminatory Rules</title>
+    <title>Inspect Demographic Groups</title>
 </head>
 
 <body>
 
 {% include 'navbar.html' %}
 <div class="container mt-4">
-    <div class="alert alert-info" role="alert">
-        <h5> <center> Below you find an overview of demographic groups in your data. Click on any of the groups, to inspect them more closely. </center>  </h5>
-    </div>
-
-
-
-    <button class="collapsible">🔻 What are Discriminatory Patterns? </button>
+    <button class="collapsible">🔻 What is shown here? </button>
         <div class="content">
-        <p>For this decision task, we believe that <strong>white men are more frequently associated with high incomes</strong>, while other demographic groups are more often linked to low incomes. Our goal is to uncover <strong>which white men may be benefiting from favoritism</strong> and <strong>which other groups may be experiencing discrimination</strong>.</p>
-
+        <p>For this decision task, we believe that <strong>white men are more frequently associated with high incomes
+        </strong>, while other demographic groups are more often linked to low incomes.
+            Our goal is to uncover <strong>which white men may be benefiting from favoritism</strong> and <strong>which other
+                groups may be experiencing discrimination</strong>.</p>
         <p>🔍 <strong>How it works:</strong></p>
         <ul>
-            <li><strong>Defining groups:</strong> We identify at-risk groups based on a mix of <em>sensitive characteristics</em> (e.g., sex, race) and <em>neutral characteristics</em> (e.g., occupation, education level). Each group is linked to a decision outcome (e.g., income = low or high).</li>
-            <li><strong>Confidence:</strong> This measures how strongly a decision outcome is associated with a group. A higher confidence means that a large proportion of people in the group experience the same outcome.</li>
-            <li><strong>Slift:</strong> We compare the confidence of a decision outcome for a group with the same group after swapping the sensitive characteristics:
+            <li><strong>Defining groups:</strong> We describe at-risk groups based on their <em>sensitive characteristics</em> (e.g., sex, race) and <em>neutral characteristics</em> (e.g., occupation, education level). Each group is linked to a decision outcome (e.g., income = low or high).</li>
+            <li><strong>Confidence:</strong> The confidence displays how strongly the at-risk group is associated with the displayed decision outcome. A higher confidence means that a large proportion of people in the group experience that same outcome.</li>
+            <li><strong>Slift:</strong>  The slift measures how problematic the association between the at-risk group and a decision outcome is. It is calculated, by the decrease in confidence, when swapping around the sensitive characteristics of the at-risk group
+
             <ul>
                 <li>If the original group consists of <strong>white men</strong>, we check how often the outcome applies to <strong>non-white men</strong>.</li>
-                <li>If the original group consists of <strong>any other demographic group</strong> (e.g., women, white women, Black people, Black women, Black men), we compare it to the reference group of <strong>white men</strong>.</li>
-                <li>A large shift suggests that the sensitive characteristic may be influencing decisions unfairly.</li>
+                <li>If the original group consists of <strong>any other demographic group</strong> (e.g., women, white women, black people, black women, black men), we compare it to the reference group of <strong>white men</strong>.</li>
+                <li>A large slift suggests that the sensitive characteristic may be influencing decisions unfairly.</li>
             </ul>
         </ul>
 
@@ -59,8 +56,6 @@
             </ul>
         </div>
     </div>
-
-    <br>
     <br>
 
     {% for pd_itemset, rules in patterns.items() %}
@@ -90,7 +85,7 @@
                     <!-- Third image-text pair -->
                     <div style="display: inline-flex; align-items: center; gap: 10px;">
                         <img src="{{ url_for('static', filename='magnifying_glass.png') }}" alt="N Rules" width="30">
-                        <span> <b> Number of discriminatory patterns </b>  = {{ rules|length }}</span>
+                        <span> <b> Number of at-risk groups </b>  = {{ rules|length }}</span>
                     </div>
                 </div>
             </div>
@@ -117,7 +112,7 @@
                                 <div class="disc_pattern_upperbox inactive_upperbox">
                                     <center>
                                         <h6>
-                                            <a href="{{url_for('inspect_patterns', pd_itemset=pd_itemset, pattern_id = rule['id'], pos_ratio_pd_itemset = pd_itemset_pos_ratio[pd_itemset] , n_pd_itemset = pd_itemset_n[pd_itemset] )}}" style="color:white;"> Pattern {{loop.index}} </a>
+                                            <a href="{{url_for('inspect_patterns', pd_itemset=pd_itemset, pattern_id = rule['id'], pos_ratio_pd_itemset = pd_itemset_pos_ratio[pd_itemset] , n_pd_itemset = pd_itemset_n[pd_itemset] )}}" style="color:white;"> At-Risk Group {{loop.index}} </a>
                                         </h6>
                                     </center>
                                 </div>

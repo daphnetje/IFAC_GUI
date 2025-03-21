@@ -56,7 +56,7 @@
 
         <button class="collapsible">🔻 Show Explanation</button>
                     <div class="content">
-                    <p>This analysis checks whether an individual instance receives <strong>fair treatment</strong> in decision-making.</p>
+                    <p>Below all the at-risk subgroups within the selected demographic group of ... are displayed. /p>
 
                     <p>🔍 <strong>How it works:</strong></p>
                     <ul>
@@ -64,14 +64,6 @@
                         <li>One group, called the <strong>reference group</strong> (i.e., White Men), is assumed to receive more favorable outcomes.</li>
                         <li>If individuals in the reference group <strong>consistently get better predictions</strong> than similar individuals from other groups, it suggests that <strong>race or gender</strong> may be unfairly influencing the decision of the selected instance.</li>
 
-                    </ul>
-
-                    <p>By spotting these patterns, we can detect potential discrimination and ensure fairer decision-making. </p>
-
-                    <p>⚠️<strong> What to Look Out For </strong> </p>
-                    <ul>
-                        <li>Finding truly comparable cases isn't always easy. Sometimes, the so-called "similar" individuals may still differ in important ways, such as <strong>working hours</strong> or <strong>occupation</strong>. These differences could explain variations in outcomes and are not necessarily signs of discrimination.</li>
-                        <li>Before drawing conclusions, double-check whether the selected instances are <strong>similar enough</strong> for a fair comparison. </li>
                     </ul>
                 </div>
 
@@ -101,7 +93,7 @@
                             <center>
                                 <h6>
                                     <a href="{{ url_for('inspect_patterns', pd_itemset=pd_itemset, pattern_id=rule['id'], n_pd_itemset=n_pd_itemset, pos_ratio_pd_itemset=pos_ratio_pd_itemset) }}" style="color:white;">
-                                        Pattern {{ loop.index }}
+                                        At-Risk Group {{ loop.index }}
                                     </a>
                                 </h6>
                             </center>
@@ -119,7 +111,7 @@
                             <center>
                                 <h6>
                                     <a href="{{ url_for('inspect_patterns', pd_itemset=pd_itemset, pattern_id=rule['id'], n_pd_itemset=n_pd_itemset, pos_ratio_pd_itemset=pos_ratio_pd_itemset) }}" style="color:white;">
-                                        Pattern {{ loop.index }}
+                                        At-Risk Group {{ loop.index }}
                                     </a>
                                 </h6>
                             </center>
@@ -158,11 +150,11 @@
 
 <div class="card-header text-center">
     {% if number_of_affected_instances > 0 %}
-        <h5> There are {{number_of_affected_instances}} instances covered by the selected pattern </h5>
-        <p> Highlighted are at risk of individual discrimination </p>
+        <h5> There are {{number_of_affected_instances}} instances within this group </h5>
+        <p> Select individual instances to understand the individual discrimination scores </p>
     {% else %}
         <h5> These are all the {{ pd_itemset_in_html }} in the dataset </h5>
-        <p> Click on a pattern above to inspect which {{ pd_itemset_in_html }} are at risk of discrimination </p>
+        <p> Click on a subgroup above to inspect which {{ pd_itemset_in_html }} are at risk of discrimination </p>
     {% endif %}
 </div>
 
@@ -187,18 +179,19 @@
 
   <tbody>
     {% for i, row in sorted_by_disc_score_data_to_highlight.iterrows() %}
-        {% if sorted_by_disc_score_data_to_highlight.loc[i]['disc_score'] >= 0.3 %}
-            <tr class="table-danger">
-        {% else %}
+    <!--        {% if sorted_by_disc_score_data_to_highlight.loc[i]['disc_score'] >= 0.3 %}-->
+    <!--            <tr class="table-danger">-->
+    <!--        {% else %}-->
+    <!--            <tr class="table-warning">-->
+    <!--        {% endif %}-->
             <tr class="table-warning">
-        {% endif %}
             {% for column in column_names %}
                 {% if column == 'id' %}
                     <td> {{ i }} </td>
                 {% elif column in column_names_in_pattern %}
                     <td> <i> {{row[column]}} </i> </td>
                 {% else %}
-                    <td> <span style="font-weight: 500;"> {{row[column]}} </span> </td>
+                    <td> {{row[column]}} </td>
                 {% endif %}
             {% endfor %}
             <td> {{ row['disc_score'] | round(2) }} </td>
@@ -232,8 +225,6 @@
 </div>
 </div>
 </div>
-
-
 
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm" crossorigin="anonymous"></script>

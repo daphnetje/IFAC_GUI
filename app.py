@@ -47,37 +47,37 @@ def close_db(error):
     if hasattr(g, 'sqlite_db'):
         g.sqlite_db.close()
 
+#
+# @app.route('/', methods = ['GET', 'POST'])
+# def index():
+#     if request.method == 'POST':
+#         selected_column_filters = {}
+#
+#         # Get the number of dynamically generated select fields
+#         num_select_fields = len([key for key in request.form.keys() if key.startswith('dependent_select_')])
+#
+#         # Iterate through the select fields and insert data into the database
+#         for i in range(1, num_select_fields + 1):
+#             selected_column_name = request.form.get(f'main_select_{i}')
+#             selected_value = request.form.get(f'dependent_select_{i}')
+#             selected_column_filters[selected_column_name] = selected_value
+#
+#         db = get_db()
+#         query_to_filter, values_to_filter = query_builder_multiple_filters(relevant_table='test_data',relevant_columns='*', column_value_filter_dict=selected_column_filters)
+#         adult_dataset_cursor = db.execute(query_to_filter, values_to_filter)
+#         results = adult_dataset_cursor.fetchall()
+#         print(len(results))
+#         adult_dataset_cursor.close()
+#         return render_template('home.html', column_names=dataset_dict.keys(), numerical_cols = numerical_columns, results=results, number_of_results = len(results))
+#
+#     db = get_db()
+#     adult_dataset_cursor = db.execute('select * from test_data')
+#     results = adult_dataset_cursor.fetchall()
+#     adult_dataset_cursor.close()
+#     return render_template('home.html', column_names = dataset_dict.keys(),numerical_cols = numerical_columns, results = results, number_of_results = len(results))
 
 @app.route('/', methods = ['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        selected_column_filters = {}
-
-        # Get the number of dynamically generated select fields
-        num_select_fields = len([key for key in request.form.keys() if key.startswith('dependent_select_')])
-
-        # Iterate through the select fields and insert data into the database
-        for i in range(1, num_select_fields + 1):
-            selected_column_name = request.form.get(f'main_select_{i}')
-            selected_value = request.form.get(f'dependent_select_{i}')
-            selected_column_filters[selected_column_name] = selected_value
-
-        db = get_db()
-        query_to_filter, values_to_filter = query_builder_multiple_filters(relevant_table='test_data',relevant_columns='*', column_value_filter_dict=selected_column_filters)
-        adult_dataset_cursor = db.execute(query_to_filter, values_to_filter)
-        results = adult_dataset_cursor.fetchall()
-        print(len(results))
-        adult_dataset_cursor.close()
-        return render_template('home.html', column_names=dataset_dict.keys(), numerical_cols = numerical_columns, results=results, number_of_results = len(results))
-
-    db = get_db()
-    adult_dataset_cursor = db.execute('select * from test_data')
-    results = adult_dataset_cursor.fetchall()
-    adult_dataset_cursor.close()
-    return render_template('home.html', column_names = dataset_dict.keys(),numerical_cols = numerical_columns, results = results, number_of_results = len(results))
-
-@app.route('/filter_discriminatory_rules', methods = ['GET', 'POST'])
-def filter_discriminatory_rules():
+def inspect_demographic_groups():
     db = get_db()
 
     disc_patterns_cursor = db.execute("SELECT id, pd_itemset, rule_base, rule_conclusion, support, confidence, slift, p_value_slift FROM discriminatory_patterns")
@@ -104,7 +104,6 @@ def filter_discriminatory_rules():
         rules_for_pd_itemset = disc_patterns_df[disc_patterns_df['pd_itemset'] == pd_itemset]
         rules_in_pretty_html = rules_for_pd_itemset.apply(rule_row_to_html, axis=1)
 
-        #
         pd_itemset_dict = ast.literal_eval(pd_itemset)
         n_instances_in_pd_itemset = len(get_instances_covered_by_rule_base(pd_itemset_dict, test_dataset))
         n_instances_in_pd_itemset_pos_decision = len(get_instances_covered_by_rule_base_and_consequence(rule_base=pd_itemset_dict, rule_consequence={"income" : "high"}, data=test_dataset))
@@ -115,8 +114,9 @@ def filter_discriminatory_rules():
         pd_itemset_pos_ratio[pd_itemset] = f"{pos_ratio_pd_itemset:.2f}"
         pd_itemset_n[pd_itemset] = n_instances_in_pd_itemset
 
+    print(pd_itemset_html_dict)
 
-    return render_template("filter_discriminatory_rules.html", patterns=pd_itemset_rule_dict, pd_itemset_html_dict=pd_itemset_html_dict, pd_itemset_n = pd_itemset_n, pd_itemset_pos_ratio=pd_itemset_pos_ratio)
+    return render_template("inspect_demographic_groups.html", patterns=pd_itemset_rule_dict, pd_itemset_html_dict=pd_itemset_html_dict, pd_itemset_n = pd_itemset_n, pd_itemset_pos_ratio=pd_itemset_pos_ratio)
 
 
 #@app.route('/inspect_patterns/<pd_itemset>/', defaults = {'pattern_id': -99999}, methods = ['GET'])

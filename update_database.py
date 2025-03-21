@@ -3,8 +3,10 @@ import sqlite3
 
 
 # Load each sheet into a DataFrame (modify sheet names if necessary)
-df_discriminatory_patterns = pd.read_excel("rules.xlsx")
-df_discriminatory_patterns = df_discriminatory_patterns[df_discriminatory_patterns['support'] >= 0.01]
+# df_discriminatory_patterns = pd.read_excel("rules.xlsx")
+# df_discriminatory_patterns = df_discriminatory_patterns[df_discriminatory_patterns['support'] >= 0.01]
+df_discriminatory_patterns = pd.read_excel("updated_rules.xlsx")
+df_discriminatory_patterns = df_discriminatory_patterns[df_discriminatory_patterns['slift'] >= 0.50]
 df_validation = pd.read_excel("adult_val_with_pred.xlsx")
 df_test = pd.read_excel("adult_test_with_pred.xlsx")
 
